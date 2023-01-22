@@ -34,7 +34,7 @@ model_name = st.sidebar.radio("Model", [
     #"gpt2-medium",
     #"gpt2-large",
     #"gpt2-xl",
-    ], index=3)
+    ], index=1)
 
 
 # Backend code
@@ -220,7 +220,7 @@ if st.session_state.attn_head_patch_out:
 
 # Attention Head Visualization
 
-st.header("Attention Head Visualization")
+st.header("Attention Pattern Visualization")
 st.markdown("Powered by [CircuitsVis](https://github.com/alan-cooney/CircuitsVis)")
 st.markdown("Enter a prompt, show attention patterns")
 
