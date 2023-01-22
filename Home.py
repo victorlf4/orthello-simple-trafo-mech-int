@@ -175,11 +175,14 @@ if "attn_html" not in st.session_state:
 
 if st.button("Run model", key="key_button_attention_head"):
     _, cache = model.run_with_cache(prompt_attn)
-    layer = 1
-    html = cv.attention.attention_patterns(tokens=model.to_str_tokens(prompt_attn),
+    st.session_state.attn_html = []
+    for layer in range(model.cfg.n_layers):
+        html = cv.attention.attention_patterns(tokens=model.to_str_tokens(prompt_attn),
                                 attention=cache[f'blocks.{layer}.attn.hook_pattern'][0])
-    st.session_state.attn_html = html.show_code()
+        st.session_state.attn_html.append(html.show_code())
 
 if st.session_state.attn_html:
-    st.components.v1.html(st.session_state.attn_html, height=500)
+    for layer in range(model.cfg.n_layers):
+        st.write(f"Attention patterns Layer {layer}:")
+        st.components.v1.html(st.session_state.attn_html[layer], height=500)
 
