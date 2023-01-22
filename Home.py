@@ -56,11 +56,7 @@ def test_prompt(prompt, answer):
     return output
 
 def compute_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None, layers=None):
-    print("Clean prompt", clean_prompt)
-    print("Corrupt prompt", corrupt_prompt)
-    print("Answer", answer)
-    print("Corrupt answer", corrupt_answer)
-
+    model.reset_hooks()
     clean_answer_index = model.tokenizer.encode(answer)[0]
     corrupt_answer_index = model.tokenizer.encode(corrupt_answer)[0]
     clean_tokens = model.to_str_tokens(clean_prompt)
@@ -80,6 +76,31 @@ def compute_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt
             patching_effect[l, pos] = prediction_logits[clean_answer_index] - prediction_logits[corrupt_answer_index]
     return patching_effect
 
+def compute_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
+    use_attn_result_prev = model.cfg.use_attn_result
+    model.cfg.use_attn_result = True
+    clean_answer_index = model.tokenizer.encode(answer)[0]
+    corrupt_answer_index = model.tokenizer.encode(corrupt_answer)[0]
+    clean_tokens = model.to_str_tokens(clean_prompt)
+    _, corrupt_cache = model.run_with_cache(corrupt_prompt)
+    # Patching function
+    def patch_head_result(activations, hook, head=None, pos=None):
+        activations[:, pos, head, :] = corrupt_cache[hook.name][:, pos, head, :]
+        return activations
+
+    n_layers = model.cfg.n_layers
+    n_heads = model.cfg.n_heads
+    n_pos = len(clean_tokens)
+    patching_effect = torch.zeros(n_layers*n_heads, n_pos)
+    for layer in range(n_layers):
+        for head in range(n_heads):
+          for pos in range(n_pos):
+              fwd_hooks = [(f"blocks.{layer}.attn.hook_result", partial(patch_head_result, head=head, pos=pos))]
+              prediction_logits = model.run_with_hooks(clean_prompt, fwd_hooks=fwd_hooks)[0, -1]
+              patching_effect[n_heads*layer+head, pos] = prediction_logits[clean_answer_index] - prediction_logits[corrupt_answer_index]
+    model.cfg.use_attn_result = use_attn_result_prev
+    return patching_effect
+
 def imshow(tensor, xlabel="X", ylabel="Y", zlabel=None, xticks=None, yticks=None, c_midpoint=0.0, c_scale="RdBu", **kwargs):
     tensor = utils.to_numpy(tensor)
     xticks = [str(x) for x in xticks]
@@ -94,16 +115,27 @@ def imshow(tensor, xlabel="X", ylabel="Y", zlabel=None, xticks=None, yticks=None
 def plot_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
     layers = ["blocks.0.hook_resid_pre", *[f"blocks.{i}.hook_resid_post" for i in range(model.cfg.n_layers)]]
     token_labels = model.to_str_tokens(clean_prompt)
-    patching_effect = compute_residual_stream_patch(clean_prompt, answer, corrupt_prompt, corrupt_answer, layers)
-    fig = imshow(patching_effect, xticks=token_labels, yticks=layers, xlabel="pos", ylabel="layer",
-       zlabel="Logit difference", title="Patching residual stream at specific layer and position")
+    patching_effect = compute_residual_stream_patch(clean_prompt=clean_prompt, answer=answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer, layers=layers)
+    fig = imshow(patching_effect, xticks=token_labels, yticks=layers, xlabel="Position", ylabel="Layer",
+       zlabel="Logit Difference", title="Patching residual stream at specific layer and position")
     return fig
+
+def plot_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
+    clean_tokens = model.to_str_tokens(clean_prompt)
+    n_layers = model.cfg.n_layers
+    n_heads = model.cfg.n_heads
+    layerhead_labels = [f"{l}.{h}" for l in range(n_layers) for h in range(n_heads)]
+    token_labels = [f"(pos {i:2}) {t}" for i, t in enumerate(clean_tokens)]
+    patching_effect = compute_attn_patch(clean_prompt=clean_prompt, answer=answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer)
+    return imshow(patching_effect, xticks=token_labels, yticks=layerhead_labels, xlabel="Position", ylabel="Layer.Head",
+           zlabel="Logit Difference", title=f"Patching attention outputs for specific layer, head, and position", width=600, height=300+200*n_layers)
 
 
 # Frontend code
 st.title("Simple Trafo Mech Int")
 st.subheader("Transformer Mechanistic Interpretability")
 st.markdown("Powered by [TransformerLens](https://github.com/neelnanda-io/TransformerLens/)")
+st.markdown("For _what_ these plots are, and _why_, see this [tutorial](https://docs.google.com/document/d/1e6cs8d9QNretWvOLsv_KaMp6kSPWpJEW0GWc0nwjqxo/).")
 
 # Predict next token
 st.header("Predict the next token")
@@ -139,7 +171,6 @@ if st.session_state.test_prompt_output:
     st.code(st.session_state.test_prompt_output)
 
 
-
 # Residual stream patching
 
 st.header("Residual stream patching")
@@ -150,10 +181,10 @@ default_clean_answer = "Hart"
 default_corrupt_prompt = "Her name was Alex Carroll. Tomorrow at lunch time Alex"
 default_corrupt_answer = "Carroll"
 
-clean_prompt   = st.text_input("Clean Prompt:",   default_clean_prompt, key="clean_prompt")
-clean_answer   = st.text_input("Correct Answer:", default_clean_answer, key="correct_answer")
-corrupt_prompt = st.text_input("Corrupt Prompt:", default_corrupt_prompt, key="corrupt_prompt")
-corrupt_answer = st.text_input("Corrupt Answer:", default_corrupt_answer, key="corrupt_answer")
+clean_prompt   = st.text_input("Clean Prompt:",   default_clean_prompt)
+clean_answer   = st.text_input("Correct Answer:", default_clean_answer)
+corrupt_prompt = st.text_input("Corrupt Prompt:", default_corrupt_prompt)
+corrupt_answer = st.text_input("Corrupt Answer:", default_corrupt_answer)
 
 if "residual_stream_patch_out" not in st.session_state:
     st.session_state.residual_stream_patch_out = None
@@ -166,9 +197,31 @@ if st.session_state.residual_stream_patch_out:
     st.plotly_chart(st.session_state.residual_stream_patch_out)
 
 
+# Attention head output
+
+st.header("Attention head output patching")
+st.markdown("Enter a clean prompt, correct answer, corrupt prompt and corrupt answer, the model will compute the patching effect")
+
+clean_prompt_attn   = st.text_input("Clean Prompt:",   default_clean_prompt, key="key2_clean_prompt_attn")
+clean_answer_attn   = st.text_input("Correct Answer:", default_clean_answer, key="key2_clean_answer_attn")
+corrupt_prompt_attn = st.text_input("Corrupt Prompt:", default_corrupt_prompt, key="key2_corrupt_prompt_attn")
+corrupt_answer_attn = st.text_input("Corrupt Answer:", default_corrupt_answer, key="key2_corrupt_answer_attn")
+
+if "attn_head_patch_out" not in st.session_state:
+    st.session_state.attn_head_patch_out = None
+
+if st.button("Run model", key="key_button_attn_head_patch"):
+    fig = plot_attn_patch(clean_prompt=clean_prompt_attn, answer=clean_answer_attn, corrupt_prompt=corrupt_prompt_attn, corrupt_answer=corrupt_answer_attn)
+    st.session_state.attn_head_patch_out = fig
+
+if st.session_state.attn_head_patch_out:
+    st.plotly_chart(st.session_state.attn_head_patch_out)
+
+
 # Attention Head Visualization
 
 st.header("Attention Head Visualization")
+st.markdown("Powered by [CircuitsVis](https://github.com/alan-cooney/CircuitsVis)")
 st.markdown("Enter a prompt, show attention patterns")
 
 default_prompt_attn = "Her name was Alex Hart. Tomorrow at lunch time Alex"
