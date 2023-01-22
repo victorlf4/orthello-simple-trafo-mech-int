@@ -10,9 +10,32 @@ import numpy as np
 import plotly.express as px
 import circuitsvis as cv
 
+# Little bit of front end for model selector
+
+# Radio buttons
+model_name = st.sidebar.radio("Model", [
+    "gelu-1l",
+    "gelu-2l",
+    "gelu-3l",
+    "gelu-4l",
+    "solu-1l",
+    "solu-2l",
+    "solu-3l",
+    "solu-4l",
+    "solu-6l",
+    "solu-8l",
+    "solu-10l",
+    "solu-12l",
+    "gpt2-small",
+    "gpt2-medium",
+    "gpt2-large",
+    "gpt2-xl",
+    ])
+
+
 # Backend code
 
-model = HookedTransformer.from_pretrained("gelu-2l")
+model = HookedTransformer.from_pretrained(model_name)
 
 def predict_next_token(prompt):
     logits = model(prompt)[0,-1]
@@ -91,6 +114,7 @@ if st.button("Run model", key="key_button_prompt_simple"):
 
 if st.session_state.prompt_simple_output:
     st.code(st.session_state.prompt_simple_output)
+    st.write("Output from", model_name)
 
 
 # Test prompt
