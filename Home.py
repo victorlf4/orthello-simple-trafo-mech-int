@@ -8,7 +8,7 @@ import plotly.offline as pyo
 import plotly.graph_objs as go
 import numpy as np
 import plotly.express as px
-
+import circuitsvis as cv
 
 # Backend code
 
@@ -137,4 +137,25 @@ if st.button("Run model", key="key_button_residual_stream_patch"):
 if st.session_state.residual_stream_patch_out:
     st.plotly_chart(st.session_state.residual_stream_patch_out)
 
+
+# Attention Head Visualization
+
+st.header("Attention Head Visualization")
+st.markdown("Enter a prompt, show attention patterns")
+
+default_prompt_attn = "Her name was Alex Hart. Tomorrow at lunch time Alex"
+prompt_attn   = st.text_input("Prompt:",   default_prompt_attn)
+
+if "attn_html" not in st.session_state:
+    st.session_state.attn_html = None
+
+if st.button("Run model", key="key_button_attention_head"):
+    _, cache = model.run_with_cache(prompt_attn)
+    layer = 1
+    html = cv.attention.attention_patterns(tokens=model.to_str_tokens(prompt_attn),
+                                attention=cache[f'blocks.{layer}.attn.hook_pattern'][0])
+    st.session_state.attn_html = html.show_code()
+
+if st.session_state.attn_html:
+    st.components.v1.html(st.session_state.attn_html, height=500)
 
