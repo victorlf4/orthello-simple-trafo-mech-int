@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Flask App</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Welcome to my Flask App</h1>
+    <form action="/run_the_model" method="post" id="form1">
+        <label for="param1">Clean prompt:</label>
+        <input type="text" id="param1" name="param1"><br><br>
+        <label for="param2">Correct answer:</label>
+        <input type="text" id="param2" name="param2"><br><br>
+        <input type="submit" value="Run prompt in gelu-2l">
+    </form>
+    <div id="output1"></div>
+    <form action="/run_test_prompt" method="post" id="form2">
+        <label for="param1">Clean prompt:</label>
+        <input type="text" id="param1" name="param1"><br><br>
+        <label for="param2">Correct answer:</label>
+        <input type="text" id="param2" name="param2"><br><br>
+        <input type="submit" value="Run test_prompt">
+    </form>
+    <div id="output2"></div>
+    <form action="/run_stream_patch" method="post" id="form2">
+        <label for="param1">Clean prompt:</label>
+        <input type="text" id="param1" name="param1"><br><br>
+        <label for="param2">Correct answer:</label>
+        <input type="text" id="param2" name="param2"><br><br>
+        <input type="submit" value="Run test_prompt">
+    </form>
+    <div id="output3"></div>
+    
+    <script>
+        $("#form1").submit(function(event) {
+            event.preventDefault();
+            $.post("/run_the_model", { param1: $("#param1").val(), param2: $("#param2").val() })
+                .done(function(data) {
+                    $("#output1").html(data);
+                });
+        });
+        $("#form2").submit(function(event) {
+            event.preventDefault();
+            $.post("/run_test_prompt", { param1: $("#param1").val(), param2: $("#param2").val() })
+                .done(function(data) {
+                    $("#output2").html(data);
+                });
+        });
+        $("#form3").submit(function(event) {
+            event.preventDefault();
+            $.post("/run_stream_patch", { param1: $("#param1").val(), param2: $("#param2").val() })
+                .done(function(data) {
+                    $("#output3").html(data);
+                });
+        });
+    </script>
+</body>
+</html>
