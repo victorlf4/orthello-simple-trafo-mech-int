@@ -1,9 +1,0 @@
-runtime: python38
-entrypoint: gunicorn -b :$PORT main:app
-env_variables:
-  FLASK_APP: app.py
-handlers:
-- url: /.*
-  script: auto
-instance_class: F2
-

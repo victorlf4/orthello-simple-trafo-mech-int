@@ -30,7 +30,7 @@ model_name = st.sidebar.radio("Model", [
     #"solu-8l",
     #"solu-10l",
     #"solu-12l",
-    "gpt2-small",
+    #"gpt2-small",
     #"gpt2-medium",
     #"gpt2-large",
     #"gpt2-xl",
