@@ -16,8 +16,8 @@ import circuitsvis as cv
 model_name = st.sidebar.radio("Model", [
     "gelu-1l",
     "gelu-2l",
-    "gelu-3l",
-    "gelu-4l",
+    #"gelu-3l",
+    #"gelu-4l",
     #"attn-only-1l",
     #"attn-only-2l",
     #"attn-only-3l",
