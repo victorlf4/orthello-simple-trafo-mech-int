@@ -34,7 +34,7 @@ model_name = st.sidebar.radio("Model", [
     #"gpt2-medium",
     #"gpt2-large",
     #"gpt2-xl",
-    ])
+    ], index=3)
 
 
 # Backend code
@@ -45,6 +45,7 @@ def predict_next_token(prompt):
     logits = model(prompt)[0,-1]
     answer_index = logits.argmax()
     answer = model.tokenizer.decode(answer_index)
+    answer = f"<b>|{answer}|</b> (answer by {model.cfg.model_name})"
     return answer
 
 def test_prompt(prompt, answer):
@@ -117,8 +118,7 @@ if st.button("Run model", key="key_button_prompt_simple"):
     st.session_state.prompt_simple_output = res
 
 if st.session_state.prompt_simple_output:
-    st.code(st.session_state.prompt_simple_output)
-    st.write("Output from", model_name)
+    st.markdown(st.session_state.prompt_simple_output, unsafe_allow_html=True)
 
 
 # Test prompt
@@ -186,7 +186,7 @@ if st.button("Run model", key="key_button_attention_head"):
         st.session_state.attn_html.append(html.show_code())
 
 if st.session_state.attn_html:
-    for layer in range(model.cfg.n_layers):
+    for layer in range(len(st.session_state.attn_html)):
         st.write(f"Attention patterns Layer {layer}:")
         st.components.v1.html(st.session_state.attn_html[layer], height=500)
 
