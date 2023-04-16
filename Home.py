@@ -122,16 +122,39 @@ st.markdown("For _what_ these plots are, and _why_, see this [tutorial](https://
 
 # Predict next token
 st.header("Predict the next token")
-st.markdown("Just a simple test UI, enter a series of moves and model will predict te next one")
+st.markdown("Just a simple test UI, enter a series of moves and model will predict te next")
 
 numbers = list(range(1, 61))
-prompt_simple = st.multiselect("Prompt:",numbers,[1], key="prompt_simple")
+button_style = "padding:0px; margin:0px; width:50px; height:50px;"
+
+def button_grid():
+    num_cols = 6
+    if "selected_numbers" not in st.session_state:
+        st.session_state.selected_numbers = []
+
+    def add_to_list(num):
+        st.session_state.selected_numbers.append(num)
+
+    def update_list(selected_nums):
+        st.session_state.selected_numbers = selected_nums
+    
+    grid = st.container()
+    with grid:
+        
+        cols = st.columns(num_cols)
+        for i, num in enumerate(numbers):
+            col_idx = i % num_cols
+            
+            cols[col_idx].button(str(num), on_click=lambda num=num: add_to_list(num) )#add_to_list(num))        
+    selected_nums = st.multiselect('Selected numbers:', numbers, default=st.session_state.selected_numbers, on_change=lambda num=num: update_list(selected_nums))
+    st.session_state.selected_numbers = selected_nums
+button_grid()
 
 if "prompt_simple_output" not in st.session_state:
     st.session_state.prompt_simple_output = None
 
-if st.button("Run model", key="key_button_prompt_simple"):
-    prompt_simple=torch.tensor(prompt_simple)
+if st.button("Run model", key="key_button_prompt_simple",type="primary"):
+    prompt_simple=torch.tensor(st.session_state.selected_numbers)
     res = predict_next_token(prompt_simple)
     st.session_state.prompt_simple_output = res
 
@@ -139,16 +162,15 @@ if st.session_state.prompt_simple_output:
     st.markdown(st.session_state.prompt_simple_output, unsafe_allow_html=True)
 
 
+#Predict next token button
+
+
+
 
 # Residual stream patching
 
 st.header("Residual stream patching")
 st.markdown("Enter a clean prompt, correct answer, corrupt prompt and corrupt answer, the model will compute the patching effect")
-
-default_clean_prompt = "Her name was Alex Hart. Tomorrow at lunch time Alex"
-default_clean_answer = "Hart"
-default_corrupt_prompt = "Her name was Alex Carroll. Tomorrow at lunch time Alex"
-default_corrupt_answer = "Carroll"
 
 
 clean_prompt   = torch.tensor(st.multiselect("Clean Prompt:"   ,numbers,[20]))
@@ -159,7 +181,7 @@ corrupt_answer = torch.tensor(st.multiselect("Corrupt Answer:" ,numbers,[20]))
 if "residual_stream_patch_out" not in st.session_state:
     st.session_state.residual_stream_patch_out = None
 
-if st.button("Run model", key="key_button_residual_stream_patch"):
+if st.button("Run model", key="key_button_residual_stream_patch",type="primary"):
     
     fig = plot_residual_stream_patch(clean_prompt=clean_prompt, answer=clean_answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer)
     st.session_state.residual_stream_patch_out = fig
@@ -183,7 +205,7 @@ corrupt_answer_attn = torch.tensor(st.multiselect("Corrupt Answer:" ,numbers,[20
 if "attn_head_patch_out" not in st.session_state:
     st.session_state.attn_head_patch_out = None
 
-if st.button("Run model", key="key_button_attn_head_patch"):
+if st.button("Run model", key="key_button_attn_head_patch",type="primary"):
     fig = plot_attn_patch(clean_prompt=clean_prompt_attn, answer=clean_answer_attn, corrupt_prompt=corrupt_prompt_attn, corrupt_answer=corrupt_answer_attn)
     st.session_state.attn_head_patch_out = fig
 
@@ -203,7 +225,7 @@ prompt_attn= torch.tensor(st.multiselect("Prompt:",numbers,[20]))
 if "attn_html" not in st.session_state:
     st.session_state.attn_html = None
 
-if st.button("Run model", key="key_button_attention_head"):
+if st.button("Run model", key="key_button_attention_head",type="primary"):
     _, cache = model.run_with_cache(prompt_attn)
     st.session_state.attn_html = []
     for layer in range(model.cfg.n_layers):
