@@ -115,14 +115,14 @@ def plot_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt
            zlabel="Logit Difference", title=f"Patching attention outputs for specific layer, head, and position", width=600, height=300+200*n_layers)
 
 # Frontend code
-st.title("Simple Trafo Mech Int")
+st.title("Simple Orthello Mech Int")
 st.subheader("Transformer Mechanistic Interpretability")
 st.markdown("Powered by [TransformerLens](https://github.com/neelnanda-io/TransformerLens/)")
 st.markdown("For _what_ these plots are, and _why_, see this [tutorial](https://docs.google.com/document/d/1e6cs8d9QNretWvOLsv_KaMp6kSPWpJEW0GWc0nwjqxo/).")
 
 # Predict next token
 st.header("Predict the next token")
-st.markdown("Just a simple test UI, enter a prompt and the model will predict the next token")
+st.markdown("Just a simple test UI, enter a series of moves and model will predict te next one")
 
 numbers = list(range(1, 61))
 prompt_simple = st.multiselect("Prompt:",numbers,[1], key="prompt_simple")
@@ -207,7 +207,8 @@ if st.button("Run model", key="key_button_attention_head"):
     _, cache = model.run_with_cache(prompt_attn)
     st.session_state.attn_html = []
     for layer in range(model.cfg.n_layers):
-        html = cv.attention.attention_patterns(tokens=prompt_attn,
+
+        html = cv.attention.attention_patterns(tokens=[str(i) for i in prompt_attn.numpy()],
                                 attention=cache[f'blocks.{layer}.attn.hook_pattern'][0])
         st.session_state.attn_html.append(html.show_code())
 
