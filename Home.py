@@ -9,57 +9,41 @@ import plotly.graph_objs as go
 import numpy as np
 import plotly.express as px
 import circuitsvis as cv
-
+from transformer_lens import HookedTransformer, HookedTransformerConfig, FactoredMatrix, ActivationCache
 # Little bit of front end for model selector
 
 # Radio buttons
-model_name = st.sidebar.radio("Model", [
-    "gelu-1l",
-    "gelu-2l",
-    #"gelu-3l",
-    #"gelu-4l",
-    #"attn-only-1l",
-    #"attn-only-2l",
-    #"attn-only-3l",
-    #"attn-only-4l",
-    #"solu-1l",
-    #"solu-2l",
-    #"solu-3l",
-    #"solu-4l",
-    #"solu-6l",
-    #"solu-8l",
-    #"solu-10l",
-    #"solu-12l",
-    #"gpt2-small",
-    #"gpt2-medium",
-    #"gpt2-large",
-    #"gpt2-xl",
-    ], index=1)
-
-
+#model_name = st.sidebar.radio("Model", [
 # Backend code
+import transformer_lens.utils as utils
+cfg = HookedTransformerConfig(
+    n_layers = 8,
+    d_model = 512,
+    d_head = 64,
+    n_heads = 8,
+    d_mlp = 2048,
+    d_vocab = 61,
+    n_ctx = 59,
+    act_fn="gelu",
+    normalization_type="LNPre"
+)
+model = HookedTransformer(cfg)
+sd = utils.download_file_from_hf("NeelNanda/Othello-GPT-Transformer-Lens", "synthetic_model.pth")
+# champion_ship_sd = utils.download_file_from_hf("NeelNanda/Othello-GPT-Transformer-Lens", "championship_model.pth")
+model.load_state_dict(sd)
 
-model = HookedTransformer.from_pretrained(model_name)
 
 def predict_next_token(prompt):
     logits = model(prompt)[0,-1]
-    answer_index = logits.argmax()
-    answer = model.tokenizer.decode(answer_index)
-    answer = f"<b>|{answer}|</b> (answer by {model.cfg.model_name})"
+    answer= logits.argmax()
+    answer = f"<b>|{answer}|</b>"#TODO make this a nice looking square board 
     return answer
-
-def test_prompt(prompt, answer):
-    output = StringIO()
-    sys.stdout = output
-    utils.test_prompt(prompt, answer, model)
-    output = output.getvalue()
-    return output
 
 def compute_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None, layers=None):
     model.reset_hooks()
-    clean_answer_index = model.tokenizer.encode(answer)[0]
-    corrupt_answer_index = model.tokenizer.encode(corrupt_answer)[0]
-    clean_tokens = model.to_str_tokens(clean_prompt)
+    clean_answer_index = answer[0]#TODO make the selector 1 token
+    corrupt_answer_index = corrupt_answer[0]
+    clean_tokens = clean_prompt
     _, corrupt_cache = model.run_with_cache(corrupt_prompt)
     # Patching function
     def patch_residual_stream(activations, hook, layer="blocks.6.hook_resid_post", pos=5):
@@ -76,12 +60,12 @@ def compute_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt
             patching_effect[l, pos] = prediction_logits[clean_answer_index] - prediction_logits[corrupt_answer_index]
     return patching_effect
 
+
 def compute_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
     use_attn_result_prev = model.cfg.use_attn_result
     model.cfg.use_attn_result = True
-    clean_answer_index = model.tokenizer.encode(answer)[0]
-    corrupt_answer_index = model.tokenizer.encode(corrupt_answer)[0]
-    clean_tokens = model.to_str_tokens(clean_prompt)
+    clean_answer_index = answer[0]
+    corrupt_answer_index =corrupt_answer[0]
     _, corrupt_cache = model.run_with_cache(corrupt_prompt)
     # Patching function
     def patch_head_result(activations, hook, head=None, pos=None):
@@ -90,7 +74,7 @@ def compute_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corr
 
     n_layers = model.cfg.n_layers
     n_heads = model.cfg.n_heads
-    n_pos = len(clean_tokens)
+    n_pos = len(clean_prompt)
     patching_effect = torch.zeros(n_layers*n_heads, n_pos)
     for layer in range(n_layers):
         for head in range(n_heads):
@@ -114,22 +98,21 @@ def imshow(tensor, xlabel="X", ylabel="Y", zlabel=None, xticks=None, yticks=None
 
 def plot_residual_stream_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
     layers = ["blocks.0.hook_resid_pre", *[f"blocks.{i}.hook_resid_post" for i in range(model.cfg.n_layers)]]
-    token_labels = model.to_str_tokens(clean_prompt)
+    token_labels = clean_prompt
     patching_effect = compute_residual_stream_patch(clean_prompt=clean_prompt, answer=answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer, layers=layers)
     fig = imshow(patching_effect, xticks=token_labels, yticks=layers, xlabel="Position", ylabel="Layer",
        zlabel="Logit Difference", title="Patching residual stream at specific layer and position")
     return fig
 
 def plot_attn_patch(clean_prompt=None, answer=None, corrupt_prompt=None, corrupt_answer=None):
-    clean_tokens = model.to_str_tokens(clean_prompt)
+
     n_layers = model.cfg.n_layers
     n_heads = model.cfg.n_heads
     layerhead_labels = [f"{l}.{h}" for l in range(n_layers) for h in range(n_heads)]
-    token_labels = [f"(pos {i:2}) {t}" for i, t in enumerate(clean_tokens)]
+    token_labels = [f"(pos {i:2}) {t}" for i, t in enumerate(clean_prompt)]
     patching_effect = compute_attn_patch(clean_prompt=clean_prompt, answer=answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer)
     return imshow(patching_effect, xticks=token_labels, yticks=layerhead_labels, xlabel="Position", ylabel="Layer.Head",
            zlabel="Logit Difference", title=f"Patching attention outputs for specific layer, head, and position", width=600, height=300+200*n_layers)
-
 
 # Frontend code
 st.title("Simple Trafo Mech Int")
@@ -140,35 +123,21 @@ st.markdown("For _what_ these plots are, and _why_, see this [tutorial](https://
 # Predict next token
 st.header("Predict the next token")
 st.markdown("Just a simple test UI, enter a prompt and the model will predict the next token")
-prompt_simple = st.text_input("Prompt:", "Today, the weather is", key="prompt_simple")
+
+numbers = list(range(1, 61))
+prompt_simple = st.multiselect("Prompt:",numbers,[1], key="prompt_simple")
 
 if "prompt_simple_output" not in st.session_state:
     st.session_state.prompt_simple_output = None
 
 if st.button("Run model", key="key_button_prompt_simple"):
+    prompt_simple=torch.tensor(prompt_simple)
     res = predict_next_token(prompt_simple)
     st.session_state.prompt_simple_output = res
 
 if st.session_state.prompt_simple_output:
     st.markdown(st.session_state.prompt_simple_output, unsafe_allow_html=True)
 
-
-# Test prompt
-st.header("Verbose test prompt")
-st.markdown("Enter a prompt and the correct answer, the model will run the prompt and print the results")
-
-prompt = st.text_input("Prompt:", "The most popular programming language is", key="prompt")
-answer = st.text_input("Answer:", " Java", key="answer")
-
-if "test_prompt_output" not in st.session_state:
-    st.session_state.test_prompt_output = None
-
-if st.button("Run model", key="key_button_test_prompt"):
-    res = test_prompt(prompt, answer)
-    st.session_state.test_prompt_output = res
-    
-if st.session_state.test_prompt_output:
-    st.code(st.session_state.test_prompt_output)
 
 
 # Residual stream patching
@@ -181,15 +150,17 @@ default_clean_answer = "Hart"
 default_corrupt_prompt = "Her name was Alex Carroll. Tomorrow at lunch time Alex"
 default_corrupt_answer = "Carroll"
 
-clean_prompt   = st.text_input("Clean Prompt:",   default_clean_prompt)
-clean_answer   = st.text_input("Correct Answer:", default_clean_answer)
-corrupt_prompt = st.text_input("Corrupt Prompt:", default_corrupt_prompt)
-corrupt_answer = st.text_input("Corrupt Answer:", default_corrupt_answer)
+
+clean_prompt   = torch.tensor(st.multiselect("Clean Prompt:"   ,numbers,[20]))
+clean_answer   = torch.tensor(st.multiselect("Correct Answer:" ,numbers,[20]))
+corrupt_prompt = torch.tensor(st.multiselect("Corrupt Prompt:" ,numbers,[20]))
+corrupt_answer = torch.tensor(st.multiselect("Corrupt Answer:" ,numbers,[20]))
 
 if "residual_stream_patch_out" not in st.session_state:
     st.session_state.residual_stream_patch_out = None
 
 if st.button("Run model", key="key_button_residual_stream_patch"):
+    
     fig = plot_residual_stream_patch(clean_prompt=clean_prompt, answer=clean_answer, corrupt_prompt=corrupt_prompt, corrupt_answer=corrupt_answer)
     st.session_state.residual_stream_patch_out = fig
 
@@ -202,10 +173,12 @@ if st.session_state.residual_stream_patch_out:
 st.header("Attention head output patching")
 st.markdown("Enter a clean prompt, correct answer, corrupt prompt and corrupt answer, the model will compute the patching effect")
 
-clean_prompt_attn   = st.text_input("Clean Prompt:",   default_clean_prompt, key="key2_clean_prompt_attn")
-clean_answer_attn   = st.text_input("Correct Answer:", default_clean_answer, key="key2_clean_answer_attn")
-corrupt_prompt_attn = st.text_input("Corrupt Prompt:", default_corrupt_prompt, key="key2_corrupt_prompt_attn")
-corrupt_answer_attn = st.text_input("Corrupt Answer:", default_corrupt_answer, key="key2_corrupt_answer_attn")
+
+clean_prompt_attn   = torch.tensor(st.multiselect("Clean Prompt:"   ,numbers,[20],key="key2_clean_prompt_attn"))
+clean_answer_attn   = torch.tensor(st.multiselect("Correct Answer:" ,numbers,[20],key="key2_clean_answer_attn"))
+corrupt_prompt_attn = torch.tensor(st.multiselect("Corrupt Prompt:" ,numbers,[20], key="key2_corrupt_prompt_attn"))
+corrupt_answer_attn = torch.tensor(st.multiselect("Corrupt Answer:" ,numbers,[20], key="key2_corrupt_answer_attn"))
+
 
 if "attn_head_patch_out" not in st.session_state:
     st.session_state.attn_head_patch_out = None
@@ -224,8 +197,8 @@ st.header("Attention Pattern Visualization")
 st.markdown("Powered by [CircuitsVis](https://github.com/alan-cooney/CircuitsVis)")
 st.markdown("Enter a prompt, show attention patterns")
 
-default_prompt_attn = "Her name was Alex Hart. Tomorrow at lunch time Alex"
-prompt_attn   = st.text_input("Prompt:",   default_prompt_attn)
+prompt_attn= torch.tensor(st.multiselect("Prompt:",numbers,[20]))
+
 
 if "attn_html" not in st.session_state:
     st.session_state.attn_html = None
@@ -234,7 +207,7 @@ if st.button("Run model", key="key_button_attention_head"):
     _, cache = model.run_with_cache(prompt_attn)
     st.session_state.attn_html = []
     for layer in range(model.cfg.n_layers):
-        html = cv.attention.attention_patterns(tokens=model.to_str_tokens(prompt_attn),
+        html = cv.attention.attention_patterns(tokens=prompt_attn,
                                 attention=cache[f'blocks.{layer}.attn.hook_pattern'][0])
         st.session_state.attn_html.append(html.show_code())
 
