@@ -1,8 +1,8 @@
 # Trafo Mech Int playground
 
 Mechanistic Interpretability for everyone!
-Website to visualise Transformer internals
+Website to visualise Transformer internals for the Othello-GPT model.
+Original website by [Stefan Heimersheim](https://github.com/Stefan-Heimersheim/) and [Jonathan Ng](https://github.com/derpyplops).
+Orthello version by [Víctor Levoso Fernández](https://github.com/victorlf4/)
 
-By [Stefan Heimersheim](https://github.com/Stefan-Heimersheim/) and [Jonathan Ng](https://github.com/derpyplops).
-
-[Mechanistic Interpretability Hackathon](https://itch.io/jam/mechint) submission.
+[Mechanistic Interpretability Hackathon](https://itch.io/jam/interpretability-hackathon) submission.
