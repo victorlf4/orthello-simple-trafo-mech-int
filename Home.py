@@ -125,9 +125,10 @@ st.header("Predict the next token")
 st.markdown("Just a simple test UI, enter a series of moves and model will predict te next")
 
 numbers = list(range(1, 61))
-button_style = "padding:0px; margin:0px; width:50px; height:50px;"
+
 
 def button_grid():
+    st.markdown(""" <style> button[kind="secondary"] { padding:0px; margin:0px; width:50px; height:50px; } </style>""", unsafe_allow_html=True)
     num_cols = 6
     if "selected_numbers" not in st.session_state:
         st.session_state.selected_numbers = []
