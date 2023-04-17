@@ -158,7 +158,7 @@ def button_grid():
                 else:
                     num=num+1
                     cols[col_idx].button(str(num), on_click=lambda num=num: add_to_list(num) )#add_to_list(num))        
-    selected_nums = st.multiselect('Selected numbers:', numbers, default=st.session_state.selected_numbers, on_change=lambda num=num: update_list(selected_nums))
+    selected_nums = st.multiselect('Selected tokens:', numbers, default=st.session_state.selected_numbers, on_change=lambda num=num: update_list(selected_nums))
     st.session_state.selected_numbers = selected_nums
 button_grid()
 
