@@ -128,8 +128,11 @@ numbers = list(range(1, 61))
 
 
 def button_grid():
+    grid_size = 8
+    skip_rows = [grid_size//2-1, grid_size//2]
+    skip_cols = [grid_size//2-1, grid_size//2]
     st.markdown(""" <style> button[kind="secondary"] { padding:0px; margin:0px; width:50px; height:50px; } </style>""", unsafe_allow_html=True)
-    num_cols = 6
+    
     if "selected_numbers" not in st.session_state:
         st.session_state.selected_numbers = []
 
@@ -140,13 +143,21 @@ def button_grid():
         st.session_state.selected_numbers = selected_nums
     
     grid = st.container()
+    
     with grid:
-        
-        cols = st.columns(num_cols)
-        for i, num in enumerate(numbers):
-            col_idx = i % num_cols
-            
-            cols[col_idx].button(str(num), on_click=lambda num=num: add_to_list(num) )#add_to_list(num))        
+        num=0
+        cols = st.columns(grid_size)
+        for j in range(grid_size):
+            for i in range(grid_size):
+                col_idx = i % grid_size
+                
+                if i in skip_rows and j in skip_cols:
+                    
+                    cols[col_idx].button("",key=f'blank{i}{j}')
+                    
+                else:
+                    num=num+1
+                    cols[col_idx].button(str(num), on_click=lambda num=num: add_to_list(num) )#add_to_list(num))        
     selected_nums = st.multiselect('Selected numbers:', numbers, default=st.session_state.selected_numbers, on_change=lambda num=num: update_list(selected_nums))
     st.session_state.selected_numbers = selected_nums
 button_grid()
