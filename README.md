@@ -1,4 +1,4 @@
-# Trafo Mech Int playground
+# Orthello Mech Int playground
 
 Mechanistic Interpretability for everyone!
 Website to visualise Transformer internals for the Othello-GPT model.
